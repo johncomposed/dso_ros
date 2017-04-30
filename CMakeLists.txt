@@ -50,6 +50,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )  
 
+add_executable(dso_live ${PROJECT_SOURCE_DIR}/src/main.cpp )
 # rosbuild_add_executable(dso_live src/main.cpp ${SOURCE_FILES})
 target_link_libraries(dso_live ${DSO_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 # rosbuild_link_boost(dso_live thread)

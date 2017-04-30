@@ -38,12 +38,12 @@
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
 
-#include <ros/ros.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <geometry_msgs/PoseStamped.h>
-#include "cv_bridge/cv_bridge.h"
+// #include <ros/ros.h>
+// #include <sensor_msgs/image_encodings.h>
+// #include <sensor_msgs/Image.h>
+// #include <sensor_msgs/CameraInfo.h>
+// #include <geometry_msgs/PoseStamped.h>
+// #include "cv_bridge/cv_bridge.h"
 
 
 std::string calib = "";
@@ -137,11 +137,11 @@ FullSystem* fullSystem = 0;
 Undistort* undistorter = 0;
 int frameID = 0;
 
-void vidCb(const sensor_msgs::ImageConstPtr img)
+void vidCb(const Mat img, int timestamp)
 {
-	cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
-	assert(cv_ptr->image.type() == CV_8U);
-	assert(cv_ptr->image.channels() == 1);
+	// cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+	// assert(cv_ptr->image.type() == CV_8U);
+	// assert(cv_ptr->image.channels() == 1);
 
 
 	if(setting_fullResetRequested)
@@ -157,9 +157,9 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
 		setting_fullResetRequested=false;
 	}
 
-	MinimalImageB minImg((int)cv_ptr->image.cols, (int)cv_ptr->image.rows,(unsigned char*)cv_ptr->image.data);
+	MinimalImageB minImg((int)img.cols, (int)img.rows,(unsigned char*)img.data);
 	ImageAndExposure* undistImg = undistorter->undistort<unsigned char>(&minImg, 1,0, 1.0f);
-	undistImg->timestamp=cv_ptr->header.stamp.toSec();
+	undistImg->timestamp=timestamp; //cv_ptr->header.stamp.toSec();
 	fullSystem->addActiveFrame(undistImg, frameID);
 	frameID++;
 	delete undistImg;
@@ -172,7 +172,11 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
 
 int main( int argc, char** argv )
 {
-	ros::init(argc, argv, "dso_live");
+	// ros::init(argc, argv, "dso_live");
+
+  VideoCapture cap(0); // open the default camera
+  if(!cap.isOpened())  // check if we succeeded
+      return -1;
 
 	for(int i=1; i<argc;i++) parseArgument(argv[i]);
 
@@ -219,10 +223,29 @@ int main( int argc, char** argv )
     if(undistorter->photometricUndist != 0)
     	fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
 
-    ros::NodeHandle nh;
-    ros::Subscriber imgSub = nh.subscribe("image", 1, &vidCb);
+    // ros::NodeHandle nh;
+    // ros::Subscriber imgSub = nh.subscribe("image", 1, &vidCb);
 
-    ros::spin();
+    Mat edges;
+    namedWindow("edges",1);
+    for(;;)
+    {
+        Mat frame;
+
+        // http://stackoverflow.com/questions/35910547/opencv-get-frame-by-timestamp
+        int timestamp = (int)cap.get(CV_CAP_PROP_POS_MSEC); 
+
+        cap >> frame; // get a new frame from camera
+        cvtColor(frame, edges, CV_BGR2GRAY);
+        
+        vidCb(frame, timestamp);
+
+        if(waitKey(30) >= 0) break;
+    }
+
+    // the camera will be deinitialized automatically in VideoCapture destructor
+
+    // ros::spin();
     fullSystem->printResult("result1.txt");
     for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
     {
